@@ -7,11 +7,7 @@ import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
   const supabase = createClient(cookies())
-  
-  // return Response.json({
-  //   message:
-  //     'Uncomment this file and remove this line. You can delete this file when you are finished.',
-  // });
+
   try {    
     return Response.json({ users: await supabase.from('users').select("*",{count:'exact'}) });
   } catch (error) {

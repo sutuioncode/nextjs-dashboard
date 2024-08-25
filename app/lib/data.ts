@@ -4,11 +4,10 @@ import {
   InvoiceForm,
   InvoicesTable,
   LatestInvoiceRaw,
-  Revenue,
+  Revenue
 } from './definitions';
-import { formatCurrency } from './utils';
 import { createClient } from './supabase/client';
-import { cookies } from 'next/headers';
+import { formatCurrency } from './utils';
 export async function fetchRevenue() {
   try {
     // Artificially delay a response for demo purposes.
@@ -17,10 +16,7 @@ export async function fetchRevenue() {
     // console.log('Fetching revenue data...');
     // await new Promise((resolve) => setTimeout(resolve, 3000));
 
-    const data = (await createClient().from('revenue').select<"*",Revenue>()).data;
-
-    console.log('Data fetch completed after 3 seconds.', data);
-
+    const data = (await createClient().from('revenue').select<"*", Revenue>()).data;
     return data;
   } catch (error) {
     console.error('Database Error:', error);
@@ -28,17 +24,19 @@ export async function fetchRevenue() {
   }
 }
 
-export async function fetchLatestInvoices() {
+export async function fetchLatestInvoices(): Promise<LatestInvoiceRaw> {
   try {
-    const data = await sql<LatestInvoiceRaw>`
-      SELECT invoices.amount, customers.name, customers.image_url, customers.email, invoices.id
-      FROM invoices
-      JOIN customers ON invoices.customer_id = customers.id
-      ORDER BY invoices.date DESC
-      LIMIT 5`;
+    // const data = await sql<LatestInvoiceRaw>`
+    //   SELECT invoices.amount, customers.name, customers.image_url, customers.email, invoices.id
+    //   FROM invoices
+    //   JOIN customers ON invoices.customer_id = customers.id
+    //   ORDER BY invoices.date DESC
+    //   LIMIT 5`;
 
-    const latestInvoices = data.rows.map((invoice) => ({
+    const data = (await createClient().from('invoices').select(`amount,id,customers(name, image_url, email)`).limit(8))
+    const latestInvoices = data.data?.map((invoice) => ({
       ...invoice,
+      ...invoice.customers,
       amount: formatCurrency(invoice.amount),
     }));
     return latestInvoices;

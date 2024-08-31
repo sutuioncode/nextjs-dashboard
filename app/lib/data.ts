@@ -53,9 +53,9 @@ export async function fetchCardData() {
     const customerCountPromise = client.from('customers').select();
 
     let { data: invoicesbystatuscount, error } = await client
-    .from('invoicesbystatuscount')
-    .select('*')
-            
+      .from('invoicesbystatuscount')
+      .select('*')
+
     const numberOfInvoices = (await invoiceCountPromise).data?.length ?? 0
     const numberOfCustomers = (await customerCountPromise).data?.length ?? 0
     const totalPaidInvoices = formatCurrency((invoicesbystatuscount)?.at(0)?.paid ?? '0');
@@ -78,31 +78,13 @@ export async function fetchFilteredInvoices(
   query: string,
   currentPage: number,
 ) {
-  const offset = (currentPage - 1) * ITEMS_PER_PAGE;
-
+  const offset = ITEMS_PER_PAGE * (currentPage - 1);
   try {
-    const invoices = await sql<InvoicesTable>`
-      SELECT
-        invoices.id,
-        invoices.amount,
-        invoices.date,
-        invoices.status,
-        customers.name,
-        customers.email,
-        customers.image_url
-      FROM invoices
-      JOIN customers ON invoices.customer_id = customers.id
-      WHERE
-        customers.name ILIKE ${`%${query}%`} OR
-        customers.email ILIKE ${`%${query}%`} OR
-        invoices.amount::text ILIKE ${`%${query}%`} OR
-        invoices.date::text ILIKE ${`%${query}%`} OR
-        invoices.status ILIKE ${`%${query}%`}
-      ORDER BY invoices.date DESC
-      LIMIT ${ITEMS_PER_PAGE} OFFSET ${offset}
-    `;
+    const invoices = (await createClient().rpc('search_invoices_with_customer', {
+      query, items_per_page: ITEMS_PER_PAGE, items_offset: offset
+    })).data
 
-    return invoices.rows;
+    return invoices?.map(x => ({ ...x, ...x.customers }));
   } catch (error) {
     console.error('Database Error:', error);
     throw new Error('Failed to fetch invoices.');
@@ -111,18 +93,13 @@ export async function fetchFilteredInvoices(
 
 export async function fetchInvoicesPages(query: string) {
   try {
-    const count = await sql`SELECT COUNT(*)
-    FROM invoices
-    JOIN customers ON invoices.customer_id = customers.id
-    WHERE
-      customers.name ILIKE ${`%${query}%`} OR
-      customers.email ILIKE ${`%${query}%`} OR
-      invoices.amount::text ILIKE ${`%${query}%`} OR
-      invoices.date::text ILIKE ${`%${query}%`} OR
-      invoices.status ILIKE ${`%${query}%`}
-  `;
+    const count = (await createClient().rpc('fetch_invoices_pages', {
+      query
+    })).data
 
-    const totalPages = Math.ceil(Number(count.rows[0].count) / ITEMS_PER_PAGE);
+    console.log({invoices: count})
+
+    const totalPages = Math.ceil(Number(count) / ITEMS_PER_PAGE);
     return totalPages;
   } catch (error) {
     console.error('Database Error:', error);
